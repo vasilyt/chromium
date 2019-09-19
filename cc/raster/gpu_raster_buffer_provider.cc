@@ -147,7 +147,8 @@ static void RasterizeSourceOOP(
   }
 
   ri->BeginRasterCHROMIUM(raster_source->background_color(), msaa_sample_count,
-                          playback_settings.use_lcd_text, color_space,
+                          playback_settings.use_lcd_text,
+                          resource_has_previous_content, color_space,
                           mailbox->name);
   float recording_to_raster_scale =
       transform.scale() / raster_source->recording_scale_factor();

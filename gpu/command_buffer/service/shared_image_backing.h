@@ -9,6 +9,7 @@
 
 #include <memory>
 
+#include "base/callback.h"
 #include "base/containers/flat_map.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/metrics/histogram_macros.h"
@@ -17,6 +18,9 @@
 #include "components/viz/common/resources/resource_format.h"
 #include "gpu/command_buffer/common/mailbox.h"
 #include "gpu/gpu_gles2_export.h"
+#include "third_party/skia/include/core/SkColor.h"
+#include "third_party/skia/include/core/SkRefCnt.h"
+#include "third_party/skia/include/core/SkSurfaceProps.h"
 #include "ui/gfx/color_space.h"
 #include "ui/gfx/geometry/size.h"
 
@@ -26,6 +30,10 @@ class ProcessMemoryDump;
 class MemoryAllocatorDump;
 }  // namespace trace_event
 }  // namespace base
+
+namespace cc {
+class PaintOpBuffer;
+}
 
 namespace gfx {
 class GpuFence;
@@ -41,6 +49,7 @@ class SharedImageRepresentationGLTexturePassthrough;
 class SharedImageRepresentationSkia;
 class SharedImageRepresentationDawn;
 class SharedImageRepresentationOverlay;
+class SharedImageRepresentationDeferred;
 class MemoryTypeTracker;
 
 // Represents the actual storage (GL texture, VkImage, GMB) for a SharedImage.
@@ -64,7 +73,21 @@ class GPU_GLES2_EXPORT SharedImageBacking {
   uint32_t usage() const { return usage_; }
   const Mailbox& mailbox() const { return mailbox_; }
   size_t estimated_size() const { return estimated_size_; }
+  bool is_write_in_progress() const {
+    return is_write_in_progress_ || is_deferred_write_in_progress_;
+  }
+  uint32_t reads_in_progress() const { return reads_in_progress_; }
   void OnContextLost();
+
+  bool BeginRead();
+  void EndRead();
+  bool BeginWrite();
+  void EndWrite();
+  cc::PaintOpBuffer* BeginDeferredWrite(SkColor background_color,
+                                        int32_t final_msaa_count,
+                                        const SkSurfaceProps& surface_props,
+                                        bool discard_previous_content);
+  void EndDeferredWrite(base::OnceClosure deferred_write_relased);
 
   // Concrete functions to manage a ref count.
   void AddRef(SharedImageRepresentation* representation);
@@ -129,6 +152,18 @@ class GPU_GLES2_EXPORT SharedImageBacking {
   virtual std::unique_ptr<SharedImageRepresentationOverlay> ProduceOverlay(
       SharedImageManager* manager,
       MemoryTypeTracker* tracker);
+  virtual std::unique_ptr<SharedImageRepresentationDeferred> ProduceDeferred(
+      SharedImageManager* manager,
+      MemoryTypeTracker* tracker);
+  // Execute pending paint ops in buffer.
+  virtual void FlushPendingPaintOpBuffer();
+
+  // Used by SharedImageRepresentationDeferred
+  SkColor background_color() const { return background_color_; }
+  int32_t final_msaa_count() const { return final_msaa_count_; }
+  const SkSurfaceProps& surface_props() const { return surface_props_; }
+  cc::PaintOpBuffer* paint_op_buffer() const { return paint_op_buffer_.get(); }
+  void ResetPaintOpBuffer();
 
   // Used by subclasses in Destroy.
   bool have_context() const;
@@ -188,6 +223,21 @@ class GPU_GLES2_EXPORT SharedImageBacking {
   // backing. The first reference is considered the owner, and the vector is
   // ordered by the order in which references were taken.
   std::vector<SharedImageRepresentation*> refs_;
+
+  // Surface related stuff for deferred wriate access.
+  SkColor background_color_ = SK_ColorWHITE;
+  int32_t final_msaa_count_ = 1;
+  SkSurfaceProps surface_props_{0 /* flags */, kUnknown_SkPixelGeometry};
+
+  // |paint_op_buffer_| stores pending paint ops which will be executed when
+  // necessary.
+  sk_sp<cc::PaintOpBuffer> paint_op_buffer_;
+
+  base::OnceClosure deferred_write_released_;
+
+  bool is_write_in_progress_ = false;
+  bool is_deferred_write_in_progress_ = false;
+  uint32_t reads_in_progress_ = 0;
 };
 
 }  // namespace gpu

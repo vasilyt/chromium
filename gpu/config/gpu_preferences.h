@@ -198,6 +198,9 @@ struct GPU_EXPORT GpuPreferences {
 
   bool enable_oop_rasterization_ddl = false;
 
+  // Execute raster works on demand, not in order.
+  bool enable_oop_rasterization_ooor = false;
+
   // Start the watchdog suspended, as the app is already backgrounded and won't
   // send a background/suspend signal.
   bool watchdog_starts_backgrounded = false;

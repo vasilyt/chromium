@@ -106,7 +106,8 @@ TEST_F(RasterInProcessCommandBufferTest,
 
   // Call BeginRasterCHROMIUM.
   ri_->BeginRasterCHROMIUM(/*sk_color=*/0, /*msaa_sample_count=*/0,
-                           /*can_use_lcd_text=*/false, color_space,
+                           /*can_use_lcd_text=*/false,
+                           /*has_previous_content=*/true, color_space,
                            mailbox.name);
   EXPECT_EQ(static_cast<GLenum>(GL_NO_ERROR), ri_->GetError());
 

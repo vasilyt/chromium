@@ -353,8 +353,10 @@ void HeadsUpDisplayLayerImpl::UpdateHudTexture(
       constexpr GLuint background_color = SkColorSetARGB(0, 0, 0, 0);
       constexpr GLuint msaa_sample_count = -1;
       constexpr bool can_use_lcd_text = true;
+      constexpr bool has_previous_content = false;
       ri->BeginRasterCHROMIUM(background_color, msaa_sample_count,
-                              can_use_lcd_text, gfx::ColorSpace::CreateSRGB(),
+                              can_use_lcd_text, has_previous_content,
+                              gfx::ColorSpace::CreateSRGB(),
                               backing->mailbox.name);
       gfx::Vector2dF post_translate(0.f, 0.f);
       DummyImageProvider image_provider;

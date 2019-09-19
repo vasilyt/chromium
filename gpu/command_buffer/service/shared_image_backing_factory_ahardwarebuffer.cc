@@ -167,7 +167,6 @@ class SharedImageBackingAHB : public SharedImageBacking {
 
   // All reads and writes must wait for exiting writes to complete.
   base::ScopedFD write_sync_fd_;
-  bool is_writing_ = false;
 
   // All writes must wait for existing reads to complete.
   base::ScopedFD read_sync_fd_;
@@ -484,7 +483,7 @@ bool SharedImageBackingAHB::ProduceLegacyMailbox(
     MailboxManager* mailbox_manager) {
   // This doesn't need to take a lock because it is only called at creation
   // time.
-  DCHECK(!is_writing_);
+  DCHECK(!is_write_in_progress());
   DCHECK_EQ(size_t{0}, active_readers_.size());
   DCHECK(hardware_buffer_handle_.is_valid());
   legacy_texture_ = GenGLTexture();
@@ -556,14 +555,10 @@ SharedImageBackingAHB::ProduceSkia(
 
 bool SharedImageBackingAHB::BeginWrite(base::ScopedFD* fd_to_wait_on) {
   AutoLock auto_lock(this);
-
-  if (is_writing_ || !active_readers_.empty()) {
-    LOG(ERROR) << "BeginWrite should only be called when there are no other "
-                  "readers or writers";
+  if (!BeginWrite())
     return false;
-  }
+  DCHECK(active_readers_.empty());
 
-  is_writing_ = true;
   (*fd_to_wait_on) =
       gl::MergeFDs(std::move(read_sync_fd_), std::move(write_sync_fd_));
 
@@ -572,31 +567,20 @@ bool SharedImageBackingAHB::BeginWrite(base::ScopedFD* fd_to_wait_on) {
 
 void SharedImageBackingAHB::EndWrite(base::ScopedFD end_write_fd) {
   AutoLock auto_lock(this);
-
-  if (!is_writing_) {
-    LOG(ERROR) << "Attempt to end write to a SharedImageBacking without a "
-                  "successful begin write";
-    return;
-  }
-
-  is_writing_ = false;
-
   write_sync_fd_ = std::move(end_write_fd);
+  EndWrite();
 }
 
 bool SharedImageBackingAHB::BeginRead(const SharedImageRepresentation* reader,
                                       base::ScopedFD* fd_to_wait_on) {
   AutoLock auto_lock(this);
-
-  if (is_writing_) {
-    LOG(ERROR) << "BeginRead should only be called when there are no writers";
-    return false;
-  }
-
   if (active_readers_.contains(reader)) {
     LOG(ERROR) << "BeginRead was called twice on the same representation";
     return false;
   }
+
+  if (!BeginRead())
+    return false;
 
   active_readers_.insert(reader);
   if (write_sync_fd_.is_valid()) {
@@ -623,6 +607,7 @@ void SharedImageBackingAHB::EndRead(const SharedImageRepresentation* reader,
 
   read_sync_fd_ =
       gl::MergeFDs(std::move(read_sync_fd_), std::move(end_read_fd));
+  EndRead();
 }
 
 gles2::Texture* SharedImageBackingAHB::GenGLTexture() {

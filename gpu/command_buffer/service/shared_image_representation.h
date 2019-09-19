@@ -23,6 +23,10 @@
 typedef unsigned int GLenum;
 class SkPromiseImageTexture;
 
+namespace cc {
+class PaintOpBuffer;
+}  // namespace cc
+
 namespace gpu {
 namespace gles2 {
 class Texture;
@@ -327,6 +331,41 @@ class SharedImageRepresentationOverlay : public SharedImageRepresentation {
   virtual void NotifyOverlayPromotion(bool promotion,
                                       const gfx::Rect& bounds) = 0;
 #endif
+};
+
+class SharedImageRepresentationDeferred : public SharedImageRepresentation {
+ public:
+  SharedImageRepresentationDeferred(SharedImageManager* manager,
+                                    SharedImageBacking* backing,
+                                    MemoryTypeTracker* tracker)
+      : SharedImageRepresentation(manager, backing, tracker) {}
+  class ScopedRecord {
+   public:
+    explicit ScopedRecord(SharedImageRepresentationDeferred* representation,
+                          SkColor color,
+                          int32_t final_msaa_count,
+                          const SkSurfaceProps& surface_props,
+                          bool discard_previous_recording);
+    ~ScopedRecord();
+
+    bool success() const { return !!recorder_; }
+    cc::PaintOpBuffer* recorder() const { return recorder_; }
+    void set_release_callback(base::OnceClosure callback) {
+      release_callback_ = std::move(callback);
+    }
+
+   private:
+    SharedImageRepresentationDeferred* const representation_;
+    cc::PaintOpBuffer* recorder_ = nullptr;
+    base::OnceClosure release_callback_;
+  };
+
+ private:
+  cc::PaintOpBuffer* BeginRecord(SkColor color,
+                                 int32_t final_msaa_count,
+                                 const SkSurfaceProps& surface_props,
+                                 bool discard_previous_recording);
+  void EndRecord(base::OnceClosure release_callback);
 };
 
 }  // namespace gpu

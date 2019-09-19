@@ -170,6 +170,8 @@ class GPU_GLES2_EXPORT SharedImageRepresentationFactory {
       WGPUDevice device);
   std::unique_ptr<SharedImageRepresentationOverlay> ProduceOverlay(
       const Mailbox& mailbox);
+  std::unique_ptr<SharedImageRepresentationDeferred> ProduceDeferred(
+      const Mailbox& mailbox);
 
  private:
   SharedImageManager* const manager_;

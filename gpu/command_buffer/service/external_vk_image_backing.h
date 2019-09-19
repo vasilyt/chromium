@@ -159,8 +159,6 @@ class ExternalVkImageBacking final : public SharedImageBacking {
   std::vector<SemaphoreHandle> read_semaphore_handles_;
   bool is_cleared_ = false;
 
-  bool is_write_in_progress_ = false;
-  uint32_t reads_in_progress_ = 0;
   gles2::Texture* texture_ = nullptr;
 
   // GMB related stuff.

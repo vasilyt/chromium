@@ -150,6 +150,7 @@ struct StructTraits<gpu::mojom::GpuPreferencesDataView, gpu::GpuPreferences> {
     out->enable_oop_rasterization = prefs.enable_oop_rasterization();
     out->disable_oop_rasterization = prefs.disable_oop_rasterization();
     out->enable_oop_rasterization_ddl = prefs.enable_oop_rasterization_ddl();
+    out->enable_oop_rasterization_ooor = prefs.enable_oop_rasterization_ooor();
     out->watchdog_starts_backgrounded = prefs.watchdog_starts_backgrounded();
     if (!prefs.ReadGrContextType(&out->gr_context_type))
       return false;
@@ -294,6 +295,9 @@ struct StructTraits<gpu::mojom::GpuPreferencesDataView, gpu::GpuPreferences> {
   }
   static bool enable_oop_rasterization_ddl(const gpu::GpuPreferences& prefs) {
     return prefs.enable_oop_rasterization_ddl;
+  }
+  static bool enable_oop_rasterization_ooor(const gpu::GpuPreferences& prefs) {
+    return prefs.enable_oop_rasterization_ooor;
   }
   static bool watchdog_starts_backgrounded(const gpu::GpuPreferences& prefs) {
     return prefs.watchdog_starts_backgrounded;

@@ -489,6 +489,9 @@ const char kEnableOopRasterization[] = "enable-oop-rasterization";
 // Turns on skia deferred display list for out of process raster.
 const char kEnableOopRasterizationDDL[] = "enable-oop-rasterization-ddl";
 
+// Turns on out of order rasterization for out of process raster.
+const char kEnableOopRasterizationOOOR[] = "enable-oop-rasterization-ooor";
+
 // The number of multisample antialiasing samples for GPU rasterization.
 // Requires MSAA support on GPU to have an effect. 0 disables MSAA.
 const char kGpuRasterizationMSAASampleCount[] =

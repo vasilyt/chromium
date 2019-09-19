@@ -114,6 +114,8 @@ error::Error RasterDecoderImpl::HandleBeginRasterCHROMIUMImmediate(
   GLuint sk_color = static_cast<GLuint>(c.sk_color);
   GLuint msaa_sample_count = static_cast<GLuint>(c.msaa_sample_count);
   GLboolean can_use_lcd_text = static_cast<GLboolean>(c.can_use_lcd_text);
+  GLboolean has_previous_content =
+      static_cast<GLboolean>(c.has_previous_content);
   uint32_t mailbox_size;
   if (!gles2::GLES2Util::ComputeDataSize<GLbyte, 16>(1, &mailbox_size)) {
     return error::kOutOfBounds;
@@ -127,7 +129,8 @@ error::Error RasterDecoderImpl::HandleBeginRasterCHROMIUMImmediate(
   if (mailbox == nullptr) {
     return error::kOutOfBounds;
   }
-  DoBeginRasterCHROMIUM(sk_color, msaa_sample_count, can_use_lcd_text, mailbox);
+  DoBeginRasterCHROMIUM(sk_color, msaa_sample_count, can_use_lcd_text,
+                        has_previous_content, mailbox);
   return error::kNoError;
 }
 

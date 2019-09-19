@@ -487,4 +487,9 @@ SharedImageRepresentationFactory::ProduceOverlay(const gpu::Mailbox& mailbox) {
   return manager_->ProduceOverlay(mailbox, tracker_.get());
 }
 
+std::unique_ptr<SharedImageRepresentationDeferred>
+SharedImageRepresentationFactory::ProduceDeferred(const Mailbox& mailbox) {
+  return manager_->ProduceDeferred(mailbox, tracker_.get());
+}
+
 }  // namespace gpu

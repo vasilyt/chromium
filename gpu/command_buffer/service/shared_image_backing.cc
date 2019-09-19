@@ -4,6 +4,7 @@
 
 #include "gpu/command_buffer/service/shared_image_backing.h"
 
+#include "cc/paint/paint_op_buffer.h"
 #include "gpu/command_buffer/service/memory_tracking.h"
 #include "gpu/command_buffer/service/shared_context_state.h"
 #include "gpu/command_buffer/service/shared_image_representation.h"
@@ -33,6 +34,100 @@ void SharedImageBacking::OnContextLost() {
   AutoLock auto_lock(this);
 
   have_context_ = false;
+}
+
+bool SharedImageBacking::BeginRead() {
+  if (is_write_in_progress_) {
+    DLOG(ERROR) << "A write access is in progress.";
+    return false;
+  }
+
+  if (is_deferred_write_in_progress_) {
+    DLOG(ERROR) << "A deferred write access is in progress.";
+    return false;
+  }
+
+  if (!reads_in_progress_)
+    FlushPendingPaintOpBuffer();
+  ++reads_in_progress_;
+  return true;
+}
+
+void SharedImageBacking::EndRead() {
+  DCHECK(reads_in_progress_);
+  --reads_in_progress_;
+}
+
+bool SharedImageBacking::BeginWrite() {
+  if (reads_in_progress_) {
+    DLOG(ERROR) << "Read accesses are in progress.";
+    return false;
+  }
+  if (is_write_in_progress_) {
+    DLOG(ERROR) << "A write access is in progress.";
+    return false;
+  }
+
+  if (is_deferred_write_in_progress_) {
+    DLOG(ERROR) << "A deferred write access is in progress.";
+    return false;
+  }
+
+  FlushPendingPaintOpBuffer();
+  is_write_in_progress_ = true;
+  return true;
+}
+
+void SharedImageBacking::EndWrite() {
+  DCHECK(is_write_in_progress_);
+  is_write_in_progress_ = false;
+}
+
+cc::PaintOpBuffer* SharedImageBacking::BeginDeferredWrite(
+    SkColor background_color,
+    int32_t final_msaa_count,
+    const SkSurfaceProps& surface_props,
+    bool discard_previous_recording) {
+  if (reads_in_progress_) {
+    DLOG(ERROR) << "Read accesses are in progress.";
+    return nullptr;
+  }
+  if (is_write_in_progress_) {
+    DLOG(ERROR) << "A write access is in progress.";
+    return nullptr;
+  }
+
+  if (is_deferred_write_in_progress_) {
+    DLOG(ERROR) << "A deferred write access is in progress.";
+    return nullptr;
+  }
+
+  is_deferred_write_in_progress_ = true;
+  if (paint_op_buffer_) {
+    if (discard_previous_recording) {
+      paint_op_buffer_->Reset();
+    } else {
+      constexpr size_t kMaxPaintOpSize = 4096;
+      if (paint_op_buffer_->paint_ops_size() >= kMaxPaintOpSize ||
+          (background_color_ != background_color && !IsCleared()) ||
+          final_msaa_count_ != final_msaa_count ||
+          surface_props_ != surface_props)
+        FlushPendingPaintOpBuffer();
+    }
+  } else {
+    paint_op_buffer_ = sk_make_sp<cc::PaintOpBuffer>();
+  }
+  background_color_ = background_color;
+  final_msaa_count_ = final_msaa_count;
+  surface_props_ = surface_props;
+  return paint_op_buffer_.get();
+}
+
+void SharedImageBacking::EndDeferredWrite(
+    base::OnceClosure deferred_write_released) {
+  DCHECK(is_deferred_write_in_progress_);
+  deferred_write_released_ = std::move(deferred_write_released);
+  is_deferred_write_in_progress_ = false;
 }
 
 bool SharedImageBacking::PresentSwapChain() {
@@ -75,6 +170,16 @@ std::unique_ptr<SharedImageRepresentationOverlay>
 SharedImageBacking::ProduceOverlay(SharedImageManager* manager,
                                    MemoryTypeTracker* tracker) {
   return nullptr;
+}
+
+std::unique_ptr<SharedImageRepresentationDeferred>
+SharedImageBacking::ProduceDeferred(SharedImageManager* manager,
+                                    MemoryTypeTracker* tracker) {
+  return nullptr;
+}
+
+void SharedImageBacking::FlushPendingPaintOpBuffer() {
+  NOTIMPLEMENTED();
 }
 
 void SharedImageBacking::AddRef(SharedImageRepresentation* representation) {
@@ -133,6 +238,13 @@ void SharedImageBacking::OnWriteSucceeded() {
 
 size_t SharedImageBacking::EstimatedSizeForMemTracking() const {
   return estimated_size_;
+}
+
+void SharedImageBacking::ResetPaintOpBuffer() {
+  DCHECK(paint_op_buffer_);
+  paint_op_buffer_->Reset();
+  if (deferred_write_released_)
+    std::move(deferred_write_released_).Run();
 }
 
 bool SharedImageBacking::have_context() const {

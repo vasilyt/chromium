@@ -123,6 +123,7 @@ void RasterImplementationGLES::BeginRasterCHROMIUM(
     GLuint sk_color,
     GLuint msaa_sample_count,
     GLboolean can_use_lcd_text,
+    GLboolean has_previous_content,
     const gfx::ColorSpace& color_space,
     const GLbyte* mailbox) {
   NOTREACHED();

@@ -10,6 +10,7 @@
 #include "base/trace_event/memory_dump_manager.h"
 #include "base/trace_event/process_memory_dump.h"
 #include "base/trace_event/trace_event.h"
+#include "cc/paint/paint_op_buffer.h"
 #include "components/viz/common/resources/resource_format_utils.h"
 #include "gpu/command_buffer/common/shared_image_trace_utils.h"
 #include "gpu/command_buffer/service/feature_info.h"
@@ -112,11 +113,34 @@ class WrappedSkImage : public SharedImageBacking {
     // TODO(ericrk): Handle begin/end correctness checks.
   }
 
+  void FlushPendingPaintOpBuffer() override {
+    auto* buffer = paint_op_buffer();
+    if (!buffer)
+      return;
+
+    if (buffer->size() == 0)
+      return;
+
+    auto surface = GetSkSurface(final_msaa_count(), surface_props());
+    auto* canvas = surface->getCanvas();
+    if (!IsCleared()) {
+      canvas->drawColor(background_color());
+      SetCleared();
+    }
+    cc::PlaybackParams playback_params(nullptr, SkMatrix::I());
+    buffer->Playback(canvas, playback_params);
+    surface->flush();
+    ResetPaintOpBuffer();
+  }
+
  protected:
   std::unique_ptr<SharedImageRepresentationSkia> ProduceSkia(
       SharedImageManager* manager,
       MemoryTypeTracker* tracker,
       scoped_refptr<SharedContextState> context_state) override;
+  std::unique_ptr<SharedImageRepresentationDeferred> ProduceDeferred(
+      SharedImageManager* manager,
+      MemoryTypeTracker* tracker) override;
 
  private:
   friend class gpu::raster::WrappedSkImageFactory;
@@ -337,6 +361,7 @@ std::unique_ptr<SharedImageBacking> WrappedSkImageFactory::CreateSharedImage(
     const gfx::ColorSpace& color_space,
     uint32_t usage) {
   NOTREACHED();
+  LOG(ERROR) << "EEE Create WrappedSkImage";
   return nullptr;
 }
 
@@ -372,6 +397,13 @@ std::unique_ptr<SharedImageRepresentationSkia> WrappedSkImage::ProduceSkia(
     scoped_refptr<SharedContextState> context_state) {
   DCHECK_EQ(context_state_, context_state.get());
   return std::make_unique<WrappedSkImageRepresentation>(manager, this, tracker);
+}
+
+std::unique_ptr<SharedImageRepresentationDeferred>
+WrappedSkImage::ProduceDeferred(SharedImageManager* manager,
+                                MemoryTypeTracker* tracker) {
+  return std::make_unique<SharedImageRepresentationDeferred>(manager, this,
+                                                             tracker);
 }
 
 }  // namespace raster

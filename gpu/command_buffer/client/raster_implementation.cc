@@ -1073,12 +1073,14 @@ void RasterImplementation::BeginRasterCHROMIUM(
     GLuint sk_color,
     GLuint msaa_sample_count,
     GLboolean can_use_lcd_text,
+    GLboolean has_previous_content,
     const gfx::ColorSpace& color_space,
     const GLbyte* mailbox) {
   DCHECK(!raster_properties_);
 
   helper_->BeginRasterCHROMIUMImmediate(sk_color, msaa_sample_count,
-                                        can_use_lcd_text, mailbox);
+                                        can_use_lcd_text, has_previous_content,
+                                        mailbox);
 
   raster_properties_.emplace(sk_color, can_use_lcd_text,
                              color_space.ToSkColorSpace());

@@ -391,11 +391,13 @@ struct BeginRasterCHROMIUMImmediate {
   void Init(GLuint _sk_color,
             GLuint _msaa_sample_count,
             GLboolean _can_use_lcd_text,
+            GLboolean _has_previous_content,
             const GLbyte* _mailbox) {
     SetHeader();
     sk_color = _sk_color;
     msaa_sample_count = _msaa_sample_count;
     can_use_lcd_text = _can_use_lcd_text;
+    has_previous_content = _has_previous_content;
     memcpy(ImmediateDataAddress(this), _mailbox, ComputeDataSize());
   }
 
@@ -403,9 +405,11 @@ struct BeginRasterCHROMIUMImmediate {
             GLuint _sk_color,
             GLuint _msaa_sample_count,
             GLboolean _can_use_lcd_text,
+            GLboolean _has_previous_content,
             const GLbyte* _mailbox) {
     static_cast<ValueType*>(cmd)->Init(_sk_color, _msaa_sample_count,
-                                       _can_use_lcd_text, _mailbox);
+                                       _can_use_lcd_text, _has_previous_content,
+                                       _mailbox);
     const uint32_t size = ComputeSize();
     return NextImmediateCmdAddressTotalSize<ValueType>(cmd, size);
   }
@@ -414,10 +418,11 @@ struct BeginRasterCHROMIUMImmediate {
   uint32_t sk_color;
   uint32_t msaa_sample_count;
   uint32_t can_use_lcd_text;
+  uint32_t has_previous_content;
 };
 
-static_assert(sizeof(BeginRasterCHROMIUMImmediate) == 16,
-              "size of BeginRasterCHROMIUMImmediate should be 16");
+static_assert(sizeof(BeginRasterCHROMIUMImmediate) == 20,
+              "size of BeginRasterCHROMIUMImmediate should be 20");
 static_assert(offsetof(BeginRasterCHROMIUMImmediate, header) == 0,
               "offset of BeginRasterCHROMIUMImmediate header should be 0");
 static_assert(offsetof(BeginRasterCHROMIUMImmediate, sk_color) == 4,
@@ -428,6 +433,9 @@ static_assert(
 static_assert(
     offsetof(BeginRasterCHROMIUMImmediate, can_use_lcd_text) == 12,
     "offset of BeginRasterCHROMIUMImmediate can_use_lcd_text should be 12");
+static_assert(
+    offsetof(BeginRasterCHROMIUMImmediate, has_previous_content) == 16,
+    "offset of BeginRasterCHROMIUMImmediate has_previous_content should be 16");
 
 struct RasterCHROMIUM {
   typedef RasterCHROMIUM ValueType;

@@ -250,6 +250,29 @@ SharedImageManager::ProduceOverlay(const gpu::Mailbox& mailbox,
   return representation;
 }
 
+std::unique_ptr<SharedImageRepresentationDeferred>
+SharedImageManager::ProduceDeferred(const Mailbox& mailbox,
+                                    MemoryTypeTracker* tracker) {
+  CALLED_ON_VALID_THREAD();
+
+  AutoLock autolock(this);
+  auto found = images_.find(mailbox);
+  if (found == images_.end()) {
+    LOG(ERROR) << "SharedImageManager::ProduceDeferred: Trying to Produce a "
+                  "Dawn representation from a non-existent mailbox.";
+    return nullptr;
+  }
+
+  auto representation = (*found)->ProduceDeferred(this, tracker);
+  if (!representation) {
+    LOG(ERROR) << "SharedImageManager::ProduceDeferred: Trying to produce a "
+                  "Skia representation from an incompatible mailbox.";
+    return nullptr;
+  }
+
+  return representation;
+}
+
 void SharedImageManager::OnRepresentationDestroyed(
     const Mailbox& mailbox,
     SharedImageRepresentation* representation) {

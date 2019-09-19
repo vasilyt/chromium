@@ -4,6 +4,7 @@
 
 #include "gpu/command_buffer/service/shared_image_representation.h"
 
+#include "cc/paint/paint_op_buffer.h"
 #include "third_party/skia/include/core/SkPromiseImageTexture.h"
 
 namespace gpu {
@@ -73,6 +74,37 @@ SharedImageRepresentationSkia::ScopedReadAccess::ScopedReadAccess(
 SharedImageRepresentationSkia::ScopedReadAccess::~ScopedReadAccess() {
   if (success())
     representation_->EndReadAccess();
+}
+
+SharedImageRepresentationDeferred::ScopedRecord::ScopedRecord(
+    SharedImageRepresentationDeferred* representation,
+    SkColor color,
+    int32_t final_msaa_count,
+    const SkSurfaceProps& surface_props,
+    bool discard_previous_recording)
+    : representation_(representation),
+      recorder_(representation->BeginRecord(color,
+                                            final_msaa_count,
+                                            surface_props,
+                                            discard_previous_recording)) {}
+
+SharedImageRepresentationDeferred::ScopedRecord::~ScopedRecord() {
+  if (success())
+    representation_->EndRecord(std::move(release_callback_));
+}
+
+cc::PaintOpBuffer* SharedImageRepresentationDeferred::BeginRecord(
+    SkColor color,
+    int32_t final_msaa_count,
+    const SkSurfaceProps& surface_props,
+    bool discard_previous_recording) {
+  return backing()->BeginDeferredWrite(color, final_msaa_count, surface_props,
+                                       discard_previous_recording);
+}
+
+void SharedImageRepresentationDeferred::EndRecord(
+    base::OnceClosure release_callback) {
+  backing()->EndDeferredWrite(std::move(release_callback));
 }
 
 }  // namespace gpu

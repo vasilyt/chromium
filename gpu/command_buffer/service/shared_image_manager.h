@@ -27,7 +27,7 @@ class GPU_GLES2_EXPORT SharedImageManager {
   // The factory should delete this object to release the ref.
   std::unique_ptr<SharedImageRepresentationFactoryRef> Register(
       std::unique_ptr<SharedImageBacking> backing,
-      MemoryTypeTracker* ref);
+      MemoryTypeTracker* tracker);
 
   // Marks the backing associated with a mailbox as context lost.
   void OnContextLost(const Mailbox& mailbox);
@@ -37,14 +37,16 @@ class GPU_GLES2_EXPORT SharedImageManager {
   // destroyed.
   std::unique_ptr<SharedImageRepresentationGLTexture> ProduceGLTexture(
       const Mailbox& mailbox,
-      MemoryTypeTracker* ref);
+      MemoryTypeTracker* tracker);
   std::unique_ptr<SharedImageRepresentationGLTexture>
-  ProduceRGBEmulationGLTexture(const Mailbox& mailbox, MemoryTypeTracker* ref);
+  ProduceRGBEmulationGLTexture(const Mailbox& mailbox,
+                               MemoryTypeTracker* tracker);
   std::unique_ptr<SharedImageRepresentationGLTexturePassthrough>
-  ProduceGLTexturePassthrough(const Mailbox& mailbox, MemoryTypeTracker* ref);
+  ProduceGLTexturePassthrough(const Mailbox& mailbox,
+                              MemoryTypeTracker* tracker);
   std::unique_ptr<SharedImageRepresentationSkia> ProduceSkia(
       const Mailbox& mailbox,
-      MemoryTypeTracker* ref,
+      MemoryTypeTracker* tracker,
       scoped_refptr<SharedContextState> context_state);
   std::unique_ptr<SharedImageRepresentationDawn> ProduceDawn(
       const Mailbox& mailbox,
@@ -53,6 +55,9 @@ class GPU_GLES2_EXPORT SharedImageManager {
   std::unique_ptr<SharedImageRepresentationOverlay> ProduceOverlay(
       const Mailbox& mailbox,
       MemoryTypeTracker* ref);
+  std::unique_ptr<SharedImageRepresentationDeferred> ProduceDeferred(
+      const Mailbox& mailbox,
+      MemoryTypeTracker* tracker);
 
   // Called by SharedImageRepresentation in the destructor.
   void OnRepresentationDestroyed(const Mailbox& mailbox,
@@ -72,6 +77,9 @@ class GPU_GLES2_EXPORT SharedImageManager {
   base::Optional<base::Lock> lock_;
 
   base::flat_set<std::unique_ptr<SharedImageBacking>> images_;
+
+  // Shared image has pending raster work.
+  std::vector<SharedImageBacking*> pending_images_;
 
   THREAD_CHECKER(thread_checker_);
 

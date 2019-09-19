@@ -72,6 +72,7 @@ struct GpuPreferences {
   bool enable_oop_rasterization;
   bool disable_oop_rasterization;
   bool enable_oop_rasterization_ddl;
+  bool enable_oop_rasterization_ooor;
   bool watchdog_starts_backgrounded;
   GrContextType gr_context_type;
   VulkanImplementationName use_vulkan;

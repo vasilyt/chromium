@@ -201,6 +201,7 @@ std::unique_ptr<ExternalVkImageBacking> ExternalVkImageBacking::Create(
     base::span<const uint8_t> pixel_data,
     bool is_thread_safe,
     bool using_gmb) {
+  LOG(ERROR) << "EEE Create ExternalVkImageBacking";
   VkDevice device =
       context_state->vk_context_provider()->GetDeviceQueue()->GetVulkanDevice();
   VkFormat vk_format = ToVkFormat(format);
@@ -466,10 +467,17 @@ bool ExternalVkImageBacking::BeginAccess(
     std::vector<SemaphoreHandle>* semaphore_handles,
     bool is_gl) {
   AutoLock auto_lock(this);
-  if (readonly && !reads_in_progress_) {
-    UpdateContent(kInVkImage);
-    if (texture_)
-      UpdateContent(kInGLTexture);
+  if (readonly) {
+    if (!BeginRead())
+      return false;
+    if (reads_in_progress() == 1) {
+      UpdateContent(kInVkImage);
+      if (texture_)
+        UpdateContent(kInGLTexture);
+    }
+  } else {
+    if (!BeginWrite())
+      return false;
   }
   return BeginAccessInternal(readonly, semaphore_handles);
 }
@@ -485,6 +493,9 @@ void ExternalVkImageBacking::EndAccess(bool readonly,
     } else {
       latest_content_ = kInVkImage | kInGLTexture;
     }
+    EndWrite();
+  } else {
+    EndRead();
   }
 }
 
@@ -998,22 +1009,7 @@ bool ExternalVkImageBacking::BeginAccessInternal(
     std::vector<SemaphoreHandle>* semaphore_handles) {
   DCHECK(semaphore_handles);
   DCHECK(semaphore_handles->empty());
-  if (is_write_in_progress_) {
-    DLOG(ERROR) << "Unable to begin read or write access because another write "
-                   "access is in progress";
-    return false;
-  }
-
-  if (reads_in_progress_ && !readonly) {
-    DLOG(ERROR)
-        << "Unable to begin write access because a read access is in progress";
-    return false;
-  }
-
   if (readonly) {
-    DLOG_IF(ERROR, reads_in_progress_)
-        << "Concurrent reading may cause problem.";
-    ++reads_in_progress_;
     // If a shared image is read repeatedly without any write access,
     // |read_semaphore_handles_| will never be consumed and released, and then
     // chrome will run out of file descriptors. To avoid this problem, we wait
@@ -1029,7 +1025,6 @@ bool ExternalVkImageBacking::BeginAccessInternal(
     if (write_semaphore_handle_.is_valid())
       semaphore_handles->push_back(std::move(write_semaphore_handle_));
   } else {
-    is_write_in_progress_ = true;
     *semaphore_handles = std::move(read_semaphore_handles_);
     read_semaphore_handles_.clear();
     if (write_semaphore_handle_.is_valid())
@@ -1041,14 +1036,6 @@ bool ExternalVkImageBacking::BeginAccessInternal(
 void ExternalVkImageBacking::EndAccessInternal(
     bool readonly,
     SemaphoreHandle semaphore_handle) {
-  if (readonly) {
-    DCHECK_GT(reads_in_progress_, 0u);
-    --reads_in_progress_;
-  } else {
-    DCHECK(is_write_in_progress_);
-    is_write_in_progress_ = false;
-  }
-
   if (need_sychronization()) {
     DCHECK(semaphore_handle.is_valid());
     if (readonly) {
