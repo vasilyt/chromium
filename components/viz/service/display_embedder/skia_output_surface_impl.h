@@ -11,6 +11,7 @@
 #include "base/macros.h"
 #include "base/observer_list.h"
 #include "base/optional.h"
+#include "base/threading/thread.h"
 #include "base/threading/thread_checker.h"
 #include "base/util/type_safety/pass_key.h"
 #include "components/viz/common/display/renderer_settings.h"
@@ -267,6 +268,9 @@ class VIZ_SERVICE_EXPORT SkiaOutputSurfaceImpl : public SkiaOutputSurface {
   // We defer the draw to the framebuffer until SwapBuffers or CopyOutput
   // to avoid the expense of posting a task and calling MakeCurrent.
   base::OnceCallback<bool()> deferred_framebuffer_draw_closure_;
+
+  // Dedicated compositing GPU thread
+  base::Optional<base::Thread> compositing_gpu_thread_;
 
   base::WeakPtr<SkiaOutputSurfaceImpl> weak_ptr_;
   base::WeakPtrFactory<SkiaOutputSurfaceImpl> weak_ptr_factory_{this};

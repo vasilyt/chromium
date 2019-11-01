@@ -11,6 +11,7 @@
 #include "base/bind.h"
 #include "base/bind_helpers.h"
 #include "base/callback_helpers.h"
+#include "base/command_line.h"
 #include "base/synchronization/waitable_event.h"
 #include "base/threading/thread_task_runner_handle.h"
 #include "build/build_config.h"
@@ -139,6 +140,14 @@ SkiaOutputSurfaceImpl::SkiaOutputSurfaceImpl(
           dependency_->GetVulkanContextProvider()->GetGrContextCount() > 1),
       renderer_settings_(renderer_settings) {
   DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
+
+  bool use_thread = base::CommandLine::ForCurrentProcess()->HasSwitch(
+      "use-separate-compositing-thread");
+
+  if (has_dedicated_gr_context_ && use_thread) {
+    compositing_gpu_thread_.emplace("compositing gpu");
+    compositing_gpu_thread_->Start();
+  }
 }
 
 SkiaOutputSurfaceImpl::~SkiaOutputSurfaceImpl() {
@@ -822,14 +831,28 @@ void SkiaOutputSurfaceImpl::ScheduleGpuTask(
     return;
   }
 #if 1
-  if (!sync_tokens.empty()) {
-    base::WaitableEvent event;
-    task_sequence_->ScheduleTask(
-        base::BindOnce(&base::WaitableEvent::Signal, base::Unretained(&event)),
-        std::move(sync_tokens));
-    event.Wait();
+  auto task_closure = base::BindOnce(
+      [](base::OnceClosure callback, std::vector<gpu::SyncToken> sync_tokens,
+         gpu::SingleTaskSequence* task_sequence) {
+        if (!sync_tokens.empty()) {
+          base::WaitableEvent event;
+          task_sequence->ScheduleTask(
+              base::BindOnce(&base::WaitableEvent::Signal,
+                             base::Unretained(&event)),
+              std::move(sync_tokens));
+          event.Wait();
+        }
+        std::move(callback).Run();
+      },
+      std::move(wrapped_closure), std::move(sync_tokens),
+      base::Unretained(task_sequence_.get()));
+
+  if (compositing_gpu_thread_) {
+    compositing_gpu_thread_->task_runner()->PostTask(FROM_HERE,
+                                                     std::move(task_closure));
+  } else {
+    std::move(task_closure).Run();
   }
-  std::move(wrapped_closure).Run();
 #else
   if (sync_tokens.empty()) {
     std::move(wrapped_closure).Run();
