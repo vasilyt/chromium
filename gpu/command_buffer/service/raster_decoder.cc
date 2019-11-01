@@ -2382,6 +2382,7 @@ void RasterDecoderImpl::DoRasterCHROMIUM(GLuint raster_shm_id,
   DCHECK(transfer_cache());
   shared_context_state_->set_need_context_state_reset(true);
 
+  DCHECK_EQ(0u, font_shm_size);
   if (font_shm_size > 0) {
     // Deserialize fonts before raster.
     volatile char* font_buffer_memory =

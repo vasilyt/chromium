@@ -109,6 +109,9 @@ void ClientFontManager::Serialize() {
   std::vector<uint8_t> strike_data;
   strike_server_.writeStrikeData(&strike_data);
 
+  // Do not send strike data. The data is embedded int paint ops.
+  return;
+
   const uint32_t num_handles_created =
       last_allocated_handle_id_ - last_serialized_handle_id_;
   if (strike_data.size() == 0u && num_handles_created == 0u &&

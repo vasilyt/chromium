@@ -329,13 +329,15 @@ void PaintOpWriter::Write(const sk_sp<SkTextBlob>& blob) {
   if (options_.paint_cache->Get(PaintCacheDataType::kTextBlob, blob_id))
     return;
 
+  SkSerialProcs procs;
+  #if 0
   auto encodeTypeface = [](SkTypeface* tf, void* ctx) -> sk_sp<SkData> {
     return static_cast<SkStrikeServer*>(ctx)->serializeTypeface(tf);
   };
   DCHECK(options_.strike_server);
-  SkSerialProcs procs;
   procs.fTypefaceProc = encodeTypeface;
   procs.fTypefaceCtx = options_.strike_server;
+  #endif
 
   size_t bytes_written = blob->serialize(
       procs, memory_, RoundDownToAlignment(remaining_bytes_, kSkiaAlignment));
